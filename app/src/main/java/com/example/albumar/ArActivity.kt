@@ -12,6 +12,7 @@ import android.view.WindowManager
 import android.widget.*
 import androidx.activity.ComponentActivity
 import com.google.ar.core.*
+import com.google.ar.core.exceptions.CameraNotAvailableException
 import java.io.File
 import java.util.concurrent.Executors
 import javax.microedition.khronos.egl.EGLConfig
@@ -122,8 +123,9 @@ class ArActivity : ComponentActivity(), GLSurfaceView.Renderer {
         resumed = true
     }
 
-    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, res: IntArray) {
-        super.onRequestPermissionsResult(code, perms, res)
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        val res = grantResults
         if (res.isNotEmpty() && res[0] == PackageManager.PERMISSION_GRANTED) startSession()
         else { Toast.makeText(this, "Нужен доступ к камере", Toast.LENGTH_LONG).show(); finish() }
     }
@@ -174,8 +176,14 @@ class ArActivity : ComponentActivity(), GLSurfaceView.Renderer {
                 val nd = AugmentedImageDatabase(s)
                 for ((name, f, w) in src) {
                     try {
-                        val bmp = BitmapUtil.load(f, 1024) ?: run { skipped++; continue }
-                        if (w <= 0f) nd.addImage(name, bmp) else nd.addImage(name, bmp, w / 100f)
+                        val bmp = BitmapUtil.load(f, 1024)
+                        if (bmp == null) {
+                            skipped++
+                        } else if (w <= 0f) {
+                            nd.addImage(name, bmp)
+                        } else {
+                            nd.addImage(name, bmp, w / 100f)
+                        }
                     } catch (e: Exception) { skipped++ }
                 }
                 try { dbF.outputStream().use { nd.serialize(it) }; sigF.writeText("$sig\n$skipped") } catch (_: Exception) {}
